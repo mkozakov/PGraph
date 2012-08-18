@@ -1,7 +1,7 @@
 var NodeIndex = Class.create({
   gridUnit : {
     x: 100,
-    y: 250
+    y: 200
   },
   initialize : function(nodes) {
     var _this = this;
@@ -32,9 +32,12 @@ var NodeIndex = Class.create({
       // Finding positions for children...
       var id = relativePosition.below;
       var node = this.nodes[id];
-      var i = node.getLowerNeighbors().length, total = i + identifiers.length;
+      var i = 1, total = identifiers.length;
+      var crtSize = this.findLowerNeighborGroupsSize(node);
+      var newSize = crtSize + total * 2 * this.gridUnit.x;
+      var start = node.getX() - newSize / 2 + crtSize;
       identifiers.each(function(item) {
-        result[item] = { x: node.getX() + (2 * i - total + 1) * _this.gridUnit.x, y: node.getY() + _this.gridUnit.y}
+        result[item] = { x: start + (2 * i) * _this.gridUnit.x, y: node.getY() + _this.gridUnit.y}
         ++i;
       });
     } else if (relativePosition.join) {
@@ -67,6 +70,17 @@ var NodeIndex = Class.create({
     this.nodes[node.getID()] = node;
     this.positionTree.insert(position);
     this.position2Node[position.x + ',' + position.y] = node;
+   
+  },
+  _childAdded : function(node) {
+    if (node.getUpperNeighbors().length > 0) {
+      var parent = node.getUpperNeighbors()[0];
+     var siblings = parent.getLowerNeighbors().without(node);
+      var _this = this;
+     siblings.each(function(item) {
+       _this.relativeMove(item, -_this.gridUnit.x, 0);
+     });
+    }
   },
   remove : function (node) {
     var node = this.__getActualNode(node);
@@ -74,17 +88,17 @@ var NodeIndex = Class.create({
       var position = {x: node.getX(), y: node.getY()};
       this.positionTree.remove(position);
       delete this.position2Node[position.x + ',' + position.y];
-      delete this.nodes[id];
+      delete this.nodes[node.getID()];
     }
-    if (positionTree.nearest(position, 0, 0, 'y').size() == 0) {
+    //if (this.positionTree.nearest(position, 0, 0, 'y').size() == 0) {
       // TODO shift neighbors
-    }
+    //}
     return node;
   },
   move : function(node, x, y) {
     var node = this.remove(node) || node;
     if (node) {
-      node.moveTo(x, y);
+      node.setPos(x, y);
       this.add(node);
     }
     return !!node;
@@ -92,7 +106,7 @@ var NodeIndex = Class.create({
   relativeMove : function(node, dx, dy) {
     var node = this.remove(node) || node;
     if (node) {
-      node.moveTo(node.getX() + dx, node.getY() + y);
+      node.setPos(node.getX() + dx, node.getY() + dy);
       this.add(node);
     }
     return !!node;
@@ -118,5 +132,42 @@ var NodeIndex = Class.create({
   },
   exists : function(id) {
     return !!this.nodes[id];
+  },
+  
+  findHorizontalGroupLimits : function (node, _visited, _limits) {
+    var visited = _visited || {};
+    var limits = {};
+    if (_limits)  {
+      limits.low  = Math.min(_limits.low,  item.getX());
+      limits.high = Math.min(_limits.high, item.getX());
+    } else {
+      limits = _limits || {low : node.getX(), high : node.getX()}
+    }
+    visited[node.getID()] = true;
+    var _this = this;
+    node.getSideNeighbors().each(function (item) {
+      if (item.getY() == node.getY() && !visited[item.getID]) {
+        _this.findHorizontalGroupLimits(item, visited, limits);
+      }
+    });
+    return limits;
+  },
+  
+  findHorizontalGroupSize :  function (node) {
+    var limits = this.findHorizontalGroupLimits(node);
+    return limits.high - limits.low;
+  },
+  
+  findLowerNeighborGroupsSize : function(node) {
+    var list = node.getLowerNeighbors();
+    if (list.length == 0) {
+      return -2*this.gridUnit.x;
+    }
+    var i = 0;
+    var size = this.findHorizontalGroupLimits(list[0]).high - list[0].getX();
+    for (var i = 1; i < list.length; ++i) {
+      size += 2*this.gridUnit.x + this.findHorizontalGroupSize(list[i]);
+    }
+    return size;
   }
 });
