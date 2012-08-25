@@ -216,6 +216,11 @@ var PedigreeEditor = Class.create({
             y: this.zoomCoefficient * (relY - editor.viewBoxY)
         }
     },
+
+    getRelativeCoordinates: function(absX,absY) {
+        return {
+            x: absX/this.zoomCoefficient + editor.viewBoxX,
+            y: absY/this.zoomCoefficient + editor.viewBoxY
         }
     },
 
