@@ -20,7 +20,9 @@ var PedigreeEditor = Class.create({
     },
 
     initialize: function(graphics) {
+        this.DEBUG_MODE = false;
         window.editor = this;
+        this.canvas = $('canvas');
         this._paper = Raphael("canvas", this.width, this.height);
         this.viewBoxX = 0;
         this.viewBoxY = 0;
@@ -38,6 +40,8 @@ var PedigreeEditor = Class.create({
 
         this.initMenu();
         this.nodeMenu = this.generateNodeMenu();
+        // TODO: create options bubble
+        // this.nodeTypeOptions = new NodeTypeOptions();
         this._legend = new Legend();
 
         var me = this;
@@ -71,7 +75,7 @@ var PedigreeEditor = Class.create({
             handle: null,
             placeholder: null
         };
-        Droppables.add($('canvas'), {accept: 'disorder', onDrop: this._onDropDisorder.bind(this)});
+        Droppables.add(this.canvas, {accept: 'disorder', onDrop: this._onDropDisorder.bind(this)});
         this._proband = this.addNode(this.width/2, this.height/2, 'M', false);
 
         document.observe('pedigree:child:added', function(event){
@@ -120,10 +124,9 @@ var PedigreeEditor = Class.create({
     },
 
     adjustSizeToScreen : function() {
-        var canvas = $('canvas');
         var screenDimensions = document.viewport.getDimensions();
         this.width = screenDimensions.width;
-        this.height = screenDimensions.height - canvas.cumulativeOffset().top - 4;
+        this.height = screenDimensions.height - this.canvas.cumulativeOffset().top - 4;
         if (this.getPaper()) {
             // TODO : pan to center?... set viewbox instead of size?
             this.getPaper().setSize(this.width, this.height);
@@ -206,7 +209,7 @@ var PedigreeEditor = Class.create({
             _this.zoomSlider.setValue(1 - (_this.__zoom.__crtValue - .2))
         });
         // Insert all controls in the document
-        $('canvas').insert({'after' : this.__controls});
+        this.canvas.insert({'after' : this.__controls});
     },
 
     // VIEWBOX RELATED FUNCTIONS
@@ -222,6 +225,14 @@ var PedigreeEditor = Class.create({
             x: absX/this.zoomCoefficient + editor.viewBoxX,
             y: absY/this.zoomCoefficient + editor.viewBoxY
         }
+    },
+    
+    getPositionInViewport : function (x, y) {
+      var position = this.getPositionInViewBox(x, y);
+      return {
+        x : this.canvas.cumulativeOffset().left + position.x,
+        y : this.canvas.cumulativeOffset().top + position.y
+      };
     },
 
     panTo: function(x, y) {
@@ -352,7 +363,7 @@ var PedigreeEditor = Class.create({
                 'type' : 'checkbox',
                 'function' : 'setAdopted'
             }
-        ],$('canvas'));
+        ], this.canvas);
     },
 
     initMenu : function() {
@@ -393,7 +404,7 @@ var PedigreeEditor = Class.create({
       var pos = editor.getRelativeCoordinates(x,y);
       var node = this.nodeIndex.getNodeNear(pos.x, pos.y);
       if (node && node.getType() == 'pn') {
-	var disorderObj = {};
+        var disorderObj = {};
         disorderObj.id = disorder.id.substring( disorder.id.indexOf('-') + 1);
         disorderObj.value = disorder.down('.disorder-name').firstChild.nodeValue;
         node.addDisorder(disorderObj, true);
