@@ -20,29 +20,19 @@ var PedigreeEditor = Class.create({
     },
 
     initialize: function(graphics) {
+        // Workspace
         this.DEBUG_MODE = false;
         window.editor = this;
-        this.canvas = $('canvas');
-        this._paper = Raphael("canvas", this.width, this.height);
+        this.initWorkspace();
+
+        // Canvas controls
         this.viewBoxX = 0;
         this.viewBoxY = 0;
         this.zoomCoefficient = 1;
         this.background = editor.getPaper().rect(0,0, 200, 200).attr({fill: 'blue', stroke: 'none', opacity:0}).toBack();
 
-        var nodeIndex = this.nodeIndex = new NodeIndex();
         (this.adjustSizeToScreen = this.adjustSizeToScreen.bind(this))();
-        this.adjustSizeToScreen();
         this.generateViewControls();
-
-        this.nodes = [[/*Person*/],[/*PlaceHolder*/],[/*Partnership*/]];
-        this.idCount = 1;
-        this.hoverModeZones = this._paper.set();
-
-        this.initMenu();
-        this.nodeMenu = this.generateNodeMenu();
-        // TODO: create options bubble
-        // this.nodeTypeOptions = new NodeTypeOptions();
-        this._legend = new Legend();
 
         var me = this;
         var start = function() {
@@ -70,12 +60,10 @@ var PedigreeEditor = Class.create({
         // Capture resize events
         Event.observe (window, 'resize', this.adjustSizeToScreen);
 
-        this.currentHoveredNode = null;
-        this.currentDraggable = {
-            handle: null,
-            placeholder: null
-        };
-        Droppables.add(this.canvas, {accept: 'disorder', onDrop: this._onDropDisorder.bind(this)});
+        // Nodes
+        this.nodes = [[/*Person*/],[/*PlaceHolder*/],[/*Partnership*/]];
+        var nodeIndex = this.nodeIndex = new NodeIndex();
+        this.idCount = 1;
         this._proband = this.addNode(this.width/2, this.height/2, 'M', false);
 
         document.observe('pedigree:child:added', function(event){
@@ -209,7 +197,7 @@ var PedigreeEditor = Class.create({
             _this.zoomSlider.setValue(1 - (_this.__zoom.__crtValue - .2))
         });
         // Insert all controls in the document
-        this.canvas.insert({'after' : this.__controls});
+        this.workspace.insert(this.__controls);
     },
 
     // VIEWBOX RELATED FUNCTIONS
@@ -225,6 +213,14 @@ var PedigreeEditor = Class.create({
             x: absX/this.zoomCoefficient + editor.viewBoxX,
             y: absY/this.zoomCoefficient + editor.viewBoxY
         }
+    },
+    
+    getPositionInViewport : function (x, y) {
+      var position = this.getPositionInViewBox(x, y);
+      return {
+        x : this.canvas.cumulativeOffset().left + position.x,
+        y : this.canvas.cumulativeOffset().top + position.y
+      };
     },
 
     panTo: function(x, y) {
@@ -355,12 +351,69 @@ var PedigreeEditor = Class.create({
                 'type' : 'checkbox',
                 'function' : 'setAdopted'
             }
-        ], this.canvas);
+        ]);
+    },
+
+    initWorkspace : function() {
+      this.canvas = new Element('div', {'id' : 'canvas'});
+      this.workspace = new Element('div', {'id' : 'workspace'}).update(this.canvas);
+      $('body').update(this.workspace);
+      this._paper = Raphael("canvas", this.width, this.height);
+
+      this.nodeMenu = this.generateNodeMenu();
+      // TODO: create options bubble
+      // this.nodeTypeOptions = new NodeTypeOptions();
+      this._legend = new Legend();
+      this.initMenu();
+      // TODO: add header & title
+
+
+      this.hoverModeZones = this._paper.set();
+      this.currentHoveredNode = null;
+      this.currentDraggable = {
+          handle: null,
+          placeholder: null
+      };
+      Droppables.add(this.canvas, {accept: 'disorder', onDrop: this._onDropDisorder.bind(this)});
     },
 
     initMenu : function() {
-        var el = $("action-new");
-        el.observe("click", function() {alert("new node has been created! WHOAH!")});
+      var menu = new Element('div', {'id' : 'editor-menu'});
+      editor.workspace.insert({before : menu});
+      var submenus = [{
+        name : 'internal',
+        items: [
+          { key : 'new',    label : 'New node'},
+          { key : 'undo',   label : 'Undo'},
+          { key : 'redo',   label : 'Redo'},
+          { key : 'layout', label : 'Adjust layout'},
+          { key : 'clear',  label : 'Clear all'}
+        ]
+      }, {
+        name : 'external',
+        items: [
+          { key : 'print',  label : 'Printable version'},
+          { key : 'save',   label : 'Save'},
+          { key : 'close',  label : 'Close'}
+        ]
+      }];
+      var _createSubmenu = function(data) {
+        var submenu = new Element('div', {'class' : data.name + '-actions action-group'});
+        menu.insert(submenu);
+        data.items.each(function (item) {
+          submenu.insert(_createMenuItem(item));
+        });
+      };
+      var _createMenuItem = function(data) {
+        var mi = new Element('span', {'id' : 'action-' + data.key, 'class' : 'menu-item ' + data.key}).update(data.label);
+        if (data.callback && typeof(editor[data.callback]) == 'function') {
+          mi.observe('click', function() {
+            editor[data.callback]();
+          });
+        }
+        return mi;
+      };
+      submenus.each(_createSubmenu);
     },
 
     addPartnership : function(x, y, node1, node2) {
