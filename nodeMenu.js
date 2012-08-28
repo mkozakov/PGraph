@@ -371,6 +371,6 @@ NodeMenu = Class.create({
         },
         'hidden' : function (container, inactive) {
             this._toggleFieldVisibility(container, inactive);
-        },
+        }
     }
 });
